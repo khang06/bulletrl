@@ -66,7 +66,7 @@ impl Game {
         self.renderer.clear();
 
         // Rendered from bottom to top
-        // Order is important for visibility, especialy at lower resolutions
+        // Order is important for visibility, especially at lower resolutions
         self.player.draw(&mut self.renderer);
         for x in self.bullets.iter_mut().flatten() {
             x.draw(&mut self.renderer);
