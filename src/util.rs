@@ -29,3 +29,12 @@ impl AddAssign for Vector2 {
 pub fn check_rect_overlap(p1: Vector2, s1: Vector2, p2: Vector2, s2: Vector2) -> bool {
     ((p1.x - p2.x).abs() * 2.0 < (s1.x + s2.x)) && ((p1.y - p2.y).abs() * 2.0 < (s1.y + s2.y))
 }
+
+pub fn ease_out_expo(start: f32, end: f32, t: f32) -> f32 {
+    // https://easings.net/#easeOutExpo
+    if t >= 1.0 {
+        end
+    } else {
+        start + (1.0 - (2.0f32).powf(-10.0 * t)) * (end - start)
+    }
+}

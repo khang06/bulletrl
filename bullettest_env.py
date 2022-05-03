@@ -43,11 +43,12 @@ class BulletTestEnv(gym.Env):
         self.obv = None
         self.screen = None
 
-        port = os.getpid() + 4000
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind(("127.0.0.1", port))
+        self.socket.bind(("", 0))
+        port = self.socket.getsockname()[1]
 
-        subprocess.Popen(["target/release/bullettest.exe", str(port)])
+        binary = "bullettest.exe" if os.name == "nt" else "bullettest"
+        subprocess.Popen([f"target/release/{binary}", str(port)])
         print("Waiting for client...")
         self.socket.listen(1)
         (self.conn, _) = self.socket.accept()
@@ -79,7 +80,7 @@ class BulletTestEnv(gym.Env):
         self.conn.sendall(struct.pack("B", packed_input))
         self.obv = process_image(self.recvfull(WIDTH * HEIGHT * 4))
 
-        self.render()
+        # self.render()
 
         reward = struct.unpack("f", self.recvfull(4))[0]
         done = struct.unpack("B", self.recvfull(1))[0] == 1

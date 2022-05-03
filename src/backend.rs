@@ -66,7 +66,7 @@ impl Backend for MinifbBackend {
                 input |= Input::FOCUS;
             }
 
-            if self.game.tick(input) {
+            if self.game.tick(input) || self.window.is_key_down(Key::R) {
                 self.game = Default::default();
             }
 
@@ -158,7 +158,10 @@ impl Backend for TcpBackend {
                 }
                 if reset_pending {
                     if timeout {
-                        info!("Player managed to survive 1 minute!");
+                        info!(
+                            "Player managed to survive 1 minute! {:?} {:?}",
+                            self.game.enemy.movement, self.game.enemy.pattern
+                        );
                     }
                     self.game = Default::default();
                     reset_pending = false;

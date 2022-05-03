@@ -1,11 +1,21 @@
-use crate::util::{check_rect_overlap, Vector2};
+use std::ops::RangeInclusive;
+
+use crate::util::{self, check_rect_overlap, Vector2};
 use bitflags::bitflags;
 use log::info;
+use rand::{
+    distributions::Standard,
+    prelude::{Distribution, ThreadRng},
+    Rng,
+};
 
 pub const FIELD_WIDTH: usize = 384;
 pub const FIELD_HEIGHT: usize = 448;
 const PLAYER_SIZE: i32 = 5;
 const ENEMY_SIZE: i32 = 25;
+const ENEMY_X_RANGE: RangeInclusive<f32> =
+    (FIELD_WIDTH as f32 / 2.0) - 60.0..=(FIELD_WIDTH as f32 / 2.0) + 60.0;
+const ENEMY_Y_RANGE: RangeInclusive<f32> = 50.0f32..=150.0f32;
 const BULLET_LIMIT: usize = 640;
 
 bitflags! {
@@ -50,12 +60,14 @@ impl Game {
         }
         if self.player.tick(input, &mut self.bullets) {
             info!(
-                "Player got pichu~n'd, lasted {:.2} seconds",
-                self.frame as f64 / 60.0
+                "Player got pichu~n'd, lasted {:.2} seconds...\n{:?} {:?}",
+                self.frame as f64 / 60.0,
+                self.enemy.movement,
+                self.enemy.pattern
             );
             return true;
         }
-        self.enemy.tick(&mut self.bullets);
+        self.enemy.tick(&self.player, &mut self.bullets);
 
         self.draw();
 
@@ -176,31 +188,202 @@ impl Player {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum EnemyMovement {
+    Static { pos: Vector2 },
+    Sine { speed: f32, range: f32, height: f32 },
+    EaseOutExpo { wait: u64, anim_len: u64 },
+}
+
+impl Distribution<EnemyMovement> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> EnemyMovement {
+        match rng.gen_range(0..3) {
+            0 => EnemyMovement::Static {
+                pos: Vector2::new(rng.gen_range(ENEMY_X_RANGE), rng.gen_range(ENEMY_Y_RANGE)),
+            },
+            1 => EnemyMovement::Sine {
+                speed: rng.gen_range(0.02f32..0.1f32),
+                range: rng.gen_range(90.0..=125.0),
+                height: rng.gen_range(ENEMY_Y_RANGE),
+            },
+            2 => EnemyMovement::EaseOutExpo {
+                wait: rng.gen_range(30..=60),
+                anim_len: rng.gen_range(30..=60),
+            },
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum EnemyPattern {
+    Spiral {
+        bullet_speed: f32,
+        rot_speed: f32,
+    },
+    Direct {
+        bullet_speed: f32,
+        spread: f32,
+        divisor: u64,
+    },
+    Burst {
+        bullet_speed: f32,
+        spread: f32,
+        divisor: u64,
+        amount: u64,
+    },
+}
+
+impl Distribution<EnemyPattern> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> EnemyPattern {
+        match rng.gen_range(0..3) {
+            0 => EnemyPattern::Spiral {
+                bullet_speed: rng.gen_range(2.0f32..5.0f32),
+                rot_speed: rng.gen_range(0.1f32..1.0f32),
+            },
+            1 => EnemyPattern::Direct {
+                bullet_speed: rng.gen_range(4.0f32..6.0f32),
+                spread: rng.gen_range(0.0f32..2.0f32),
+                divisor: rng.gen_range(4..=8),
+            },
+            2 => EnemyPattern::Burst {
+                // This isn't actually very well designed
+                // There are multiple scenarios where you can just sit and do nothing
+                // Oh well
+                bullet_speed: rng.gen_range(3.0f32..4.0f32),
+                spread: rng.gen_range(std::f32::consts::FRAC_PI_4..std::f32::consts::FRAC_PI_2),
+                divisor: rng.gen_range(6..=10),
+                amount: rng.gen_range(4..=8),
+            },
+            _ => unreachable!(),
+        }
+    }
+}
+
 pub struct Enemy {
     pub pos: Vector2,
+    pub target_pos: Vector2, // for EnemyMovement::EaseOutExpo
+    pub last_pos: Vector2,   // for EnemyMovement::EaseOutExpo
+    pub movement: EnemyMovement,
+    pub pattern: EnemyPattern,
     pub frame: u64,
+    rng: ThreadRng,
 }
 
 impl Default for Enemy {
     fn default() -> Self {
+        let mut rng = rand::thread_rng();
         Enemy {
-            pos: Vector2::new(FIELD_WIDTH as f32 / 2.0, 50.0),
+            pos: Vector2::new(0.0, 0.0),
+            target_pos: Vector2::new(rng.gen_range(ENEMY_X_RANGE), rng.gen_range(ENEMY_Y_RANGE)),
+            last_pos: Vector2::new(rng.gen_range(ENEMY_X_RANGE), rng.gen_range(ENEMY_Y_RANGE)),
+            movement: rng.gen(),
+            pattern: rng.gen(),
             frame: 0,
+            rng,
         }
     }
 }
 
 impl Enemy {
-    pub fn tick(&mut self, bullets: &mut [Option<Bullet>]) {
+    pub fn tick(&mut self, player: &Player, bullets: &mut [Option<Bullet>]) {
         self.frame += 1;
 
-        self.pos.x = (FIELD_WIDTH as f32 / 2.0) + (self.frame as f64 / 25.0).sin() as f32 * 125.0;
+        //self.pos.x = (FIELD_WIDTH as f32 / 2.0) + (self.frame as f64 / 25.0).sin() as f32 * 125.0;
+        self.pos = match self.movement {
+            EnemyMovement::Static { pos } => pos,
+            EnemyMovement::Sine {
+                speed,
+                range,
+                height,
+            } => Vector2::new(
+                (FIELD_WIDTH as f32 / 2.0) + (self.frame as f32 * speed).sin() as f32 * range,
+                height,
+            ),
+            EnemyMovement::EaseOutExpo { wait, anim_len } => {
+                let progress = self.frame % (anim_len + wait);
+                let t = (progress as f32 / anim_len as f32).clamp(0.0, 1.0);
+                if progress == 0 {
+                    self.last_pos = self.target_pos;
+                    self.target_pos = Vector2::new(
+                        self.rng.gen_range(ENEMY_X_RANGE),
+                        self.rng.gen_range(ENEMY_Y_RANGE),
+                    );
+                }
 
-        let angle = self.frame as f64 / 5.0;
-        self.shoot(
-            bullets,
-            Vector2::new(-2.0 * angle.sin() as f32, 2.0 * angle.cos() as f32),
-        );
+                Vector2::new(
+                    util::ease_out_expo(self.last_pos.x, self.target_pos.x, t),
+                    util::ease_out_expo(self.last_pos.y, self.target_pos.y, t),
+                )
+            }
+        };
+
+        match self.pattern {
+            EnemyPattern::Spiral {
+                bullet_speed,
+                rot_speed,
+            } => {
+                let angle = self.frame as f32 * rot_speed;
+                self.shoot(
+                    bullets,
+                    Vector2::new(
+                        bullet_speed * angle.cos() as f32,
+                        -bullet_speed * angle.sin() as f32,
+                    ),
+                );
+            }
+            EnemyPattern::Direct {
+                bullet_speed,
+                spread,
+                divisor,
+            } => {
+                if self.frame % divisor == 0 {
+                    let offset = if spread == 0.0 {
+                        0.0
+                    } else {
+                        self.rng.gen_range(0.0f32..spread) - spread / 2.0
+                    };
+                    // https://stackoverflow.com/a/27481611
+                    let delta_y = self.pos.y - player.pos.y;
+                    let delta_x = player.pos.x - self.pos.x;
+                    let angle = delta_y.atan2(delta_x) + offset;
+                    self.shoot(
+                        bullets,
+                        Vector2::new(
+                            bullet_speed * angle.cos() as f32,
+                            -bullet_speed * angle.sin() as f32,
+                        ),
+                    );
+                }
+            }
+            EnemyPattern::Burst {
+                bullet_speed,
+                spread,
+                divisor,
+                amount,
+            } => {
+                if self.frame % divisor == 0 {
+                    // https://stackoverflow.com/a/27481611
+                    let delta_y = self.pos.y - player.pos.y;
+                    let delta_x = player.pos.x - self.pos.x;
+                    let base_angle = delta_y.atan2(delta_x);
+
+                    let spread_start = -spread / 2.0;
+                    let spread_interval = spread / amount as f32;
+                    for i in 0..amount {
+                        let offset = spread_start + spread_interval * i as f32;
+                        let angle = base_angle + offset;
+                        self.shoot(
+                            bullets,
+                            Vector2::new(
+                                bullet_speed * angle.cos() as f32,
+                                -bullet_speed * angle.sin() as f32,
+                            ),
+                        );
+                    }
+                }
+            }
+        };
     }
 
     fn shoot(&self, bullets: &mut [Option<Bullet>], velocity: Vector2) {
