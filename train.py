@@ -50,19 +50,20 @@ def linear_schedule(initial_value):
 
 
 if __name__ == "__main__":
-    env = VecFrameStack(SubprocVecEnv([BulletTestEnv for _ in range(8)]), 4)
+    env = VecFrameStack(SubprocVecEnv([BulletTestEnv for _ in range(8)]), 2)
     # env = BulletTestEnv()
     model = PPO(
         "CnnPolicy",
         env,
-        tensorboard_log="./training/ppo2_bullettest_4/",
-        batch_size=256,
+        tensorboard_log="./training/ppo2_bullettest/",
+        batch_size=1024,
         ent_coef=0.005,
         n_steps=2048,
         n_epochs=3,
-        learning_rate=3e-5,
+        learning_rate=5e-5,
         clip_range=0.1,
+        # policy_kwargs=dict(net_arch=[64, 64]),
         policy_kwargs=dict(net_arch=[dict(pi=[32, 32], vf=[32, 32])]),
     )
-    model.learn(total_timesteps=50_000_000, reset_num_timesteps=False)
-    model.save("./training/ppo2_bullettest_4_model")
+    model.learn(total_timesteps=100_000_000, reset_num_timesteps=False)
+    model.save("./training/ppo2_bullettest_model")

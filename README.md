@@ -18,7 +18,7 @@ And bullet patterns:
 More complexity will probably be added once I can train a good model on what I have now.
 
 # TODO
-- [ ] Train a working model
+- [x] Train a working model: Trained for 100m steps, download it [here](https://files.catbox.moe/qeggsn.zip)
 - [ ] Curriculum learning
 - [ ] More diverse enemy behavior
 - [ ] Refactor common interface code into a library
