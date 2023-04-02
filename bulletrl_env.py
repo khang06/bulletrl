@@ -2,7 +2,7 @@ import os
 import socket
 import struct
 import subprocess
-import gym
+import gymnasium as gym
 import numpy as np
 import cv2
 
@@ -106,15 +106,15 @@ class BulletRLEnv(gym.Env):
         self.obv, reward, done = self.recv_obv()
 
         # self.render()
-        return self.obv, reward, done, {}
+        return self.obv, reward, done, False, {}
 
     def reset(self):
         if self.stepped_once:
             self.send_input(0)  # Send dummy input
             obv, _reward, _done = self.recv_obv()
-            return obv
+            return obv, {}
         else:
-            return np.empty((3, SCALED_HEIGHT, SCALED_WIDTH), dtype=np.uint8)
+            return np.empty((3, SCALED_HEIGHT, SCALED_WIDTH), dtype=np.uint8), {}
 
     def render(self, mode="human"):
         import pygame

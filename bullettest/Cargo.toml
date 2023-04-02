@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 bytemuck = "1.9.1"
 byteorder = "1.4.3"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 log = "0.4.16"
-minifb = "0.23.0"
+minifb = "0.24.0"
 rand = "0.8.5"
 bulletrl_common = { path = "../bulletrl_common" }

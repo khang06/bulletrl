@@ -114,8 +114,8 @@ unsafe extern "cdecl" fn custom_calc(state: *mut c_void) -> i32 {
         // TODO: Refine reward shaping, this is lazy
         // 50% ln(score difference) / ln(10000)
         // 50% being within 50 units on the x-axis of an enemy
-        let _score_reward = ((score_diff as f32).ln() / 10000.0f32.ln()).clamp(0.0, 1.0);
-        let _distance_reward = {
+        let score_reward = ((score_diff as f32).ln() / 10000.0f32.ln()).clamp(0.0, 1.0);
+        let distance_reward = {
             let mut max_val = None;
             for enemy in &(*ENEMY_MANAGER).enemies {
                 if (enemy.enemy_type & 0x80) != 0 && (enemy.flags & 8) == 0 {
@@ -131,12 +131,11 @@ unsafe extern "cdecl" fn custom_calc(state: *mut c_void) -> i32 {
             }
 
             // This is intentional, there should be full reward if there are no enemies left
-            //max_val.unwrap_or(1.0)
-            max_val.unwrap_or(0.0)
+            max_val.unwrap_or(1.0)
         };
 
         // Discourage hiding in the top of the screen near the start of training
-        //let reward = (distance_reward + score_reward) / 2.0;
+        let reward = (distance_reward + score_reward) / 2.0;
         /*
         let reward = if (*PLAYER).pos.y > bulletrl_common::FIELD_HEIGHT as f32 / 8.0 && !done {
             distance_reward
@@ -145,11 +144,13 @@ unsafe extern "cdecl" fn custom_calc(state: *mut c_void) -> i32 {
         };
         */
         // Just survive!!!!
+        /*
         let reward = if done {
             -1.0
         } else {
             0.1
         };
+        */
         info!("Reward: {}", reward);
 
         if client.send_obv(&state.renderer, reward, done).is_err() {

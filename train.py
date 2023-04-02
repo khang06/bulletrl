@@ -58,13 +58,13 @@ def get_wrapped_env(env):
 
 
 if __name__ == "__main__":
-    env = VecFrameStack(DummyVecEnv([get_wrapped_env(BulletTestEnv) for _ in range(32)]), 2)
-    #env = VecFrameStack(DummyVecEnv([get_wrapped_env(Touhou6Env) for _ in range(8)]), 2)
+    #env = VecFrameStack(DummyVecEnv([get_wrapped_env(BulletTestEnv) for _ in range(32)]), 2)
+    env = VecFrameStack(DummyVecEnv([get_wrapped_env(Touhou6Env) for _ in range(8)]), 2)
     # env = Touhou6Env()
     model = PPO(
         "CnnPolicy",
         env,
-        tensorboard_log="./training/bullettest_again2/",
+        tensorboard_log="./training/ppo2_touhou6/",
         batch_size=2048,
         ent_coef=0.01,
         n_steps=2048,
@@ -73,9 +73,10 @@ if __name__ == "__main__":
         clip_range=0.1,
         #policy_kwargs=dict(net_arch=[128, 128]),
         policy_kwargs=dict(net_arch=[dict(pi=[512], vf=[512])]),
+        verbose=True,
     )
     model.learn(total_timesteps=100_000_000, reset_num_timesteps=False)
-    model.save("./training/bullettest_again2")
+    model.save("./training/ppo2_touhou6")
 
     """
     model = PPO.load("./training/ppo2_bullettest_final_model")
