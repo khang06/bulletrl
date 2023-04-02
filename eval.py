@@ -1,5 +1,5 @@
 import stable_baselines3
-from bullettest_env import BulletTestEnv
+from bulletrl_env import BulletTestEnv
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3 import PPO
 from stable_baselines3.ppo import CnnPolicy

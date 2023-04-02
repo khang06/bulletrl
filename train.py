@@ -1,9 +1,10 @@
 import stable_baselines3
-from bullettest_env import BulletTestEnv
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from bulletrl_env import BulletTestEnv, Touhou6Env
+from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3 import PPO
 from stable_baselines3.ppo import CnnPolicy
 from stable_baselines3.common.vec_env import VecFrameStack
+from stable_baselines3.common.monitor import Monitor
 
 # Here for testing, taken from openai-gym source
 class RandomAgent(object):
@@ -49,21 +50,37 @@ def linear_schedule(initial_value):
     return func
 
 
+def get_wrapped_env(env):
+    def f():
+        return Monitor(env())
+
+    return f
+
+
 if __name__ == "__main__":
-    env = VecFrameStack(SubprocVecEnv([BulletTestEnv for _ in range(8)]), 2)
-    # env = BulletTestEnv()
+    env = VecFrameStack(DummyVecEnv([get_wrapped_env(BulletTestEnv) for _ in range(32)]), 2)
+    #env = VecFrameStack(DummyVecEnv([get_wrapped_env(Touhou6Env) for _ in range(8)]), 2)
+    # env = Touhou6Env()
     model = PPO(
         "CnnPolicy",
         env,
-        tensorboard_log="./training/ppo2_bullettest/",
-        batch_size=1024,
-        ent_coef=0.005,
+        tensorboard_log="./training/bullettest_again2/",
+        batch_size=2048,
+        ent_coef=0.01,
         n_steps=2048,
         n_epochs=3,
-        learning_rate=5e-5,
+        learning_rate=1e-4,
         clip_range=0.1,
-        # policy_kwargs=dict(net_arch=[64, 64]),
-        policy_kwargs=dict(net_arch=[dict(pi=[32, 32], vf=[32, 32])]),
+        #policy_kwargs=dict(net_arch=[128, 128]),
+        policy_kwargs=dict(net_arch=[dict(pi=[512], vf=[512])]),
     )
     model.learn(total_timesteps=100_000_000, reset_num_timesteps=False)
-    model.save("./training/ppo2_bullettest_model")
+    model.save("./training/bullettest_again2")
+
+    """
+    model = PPO.load("./training/ppo2_bullettest_final_model")
+    model.env = env
+    model.tensorboard_log = "./training/ppo2_touhou6_pretrained"
+    model.learn(total_timesteps=100_000_000, reset_num_timesteps=True)
+    model.save("./training/ppo2_touhou_pretrained_model")
+    """

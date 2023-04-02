@@ -1,14 +1,10 @@
-use std::{
-    io::Write,
-    net::{SocketAddr, TcpStream},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use bulletrl_common::Input;
 use log::{error, info};
 use minifb::{Key, Window, WindowOptions};
 
-use crate::game::{self, Game, Input};
+use crate::game::Game;
 
 pub trait Backend {
     fn main_loop(&mut self);
@@ -23,8 +19,8 @@ impl Default for MinifbBackend {
     fn default() -> Self {
         let mut window = Window::new(
             "bullettest",
-            game::FIELD_WIDTH,
-            game::FIELD_HEIGHT,
+            bulletrl_common::FIELD_WIDTH,
+            bulletrl_common::FIELD_HEIGHT,
             //WindowOptions::default(),
             WindowOptions {
                 topmost: true,
@@ -73,8 +69,8 @@ impl Backend for MinifbBackend {
             self.window
                 .update_with_buffer(
                     &self.game.renderer.buffer,
-                    game::FIELD_WIDTH,
-                    game::FIELD_HEIGHT,
+                    bulletrl_common::FIELD_WIDTH,
+                    bulletrl_common::FIELD_HEIGHT,
                 )
                 .expect("failed to update window");
 
@@ -91,19 +87,15 @@ impl Backend for MinifbBackend {
 
 pub struct TcpBackend {
     game: Game,
-    stream: TcpStream,
+    client: bulletrl_common::EnvClient,
 }
 
 impl TcpBackend {
     pub fn new(port: u16) -> Self {
-        info!("Connecting to port {}", port);
-        let stream = TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], port)))
-            .expect("failed to connect");
-        info!("Successfully connected!");
-
+        let client = bulletrl_common::EnvClient::new(port).expect("connecting to server");
         TcpBackend {
             game: Default::default(),
-            stream,
+            client,
         }
     }
 }
@@ -111,8 +103,6 @@ impl TcpBackend {
 impl Backend for TcpBackend {
     fn main_loop(&mut self) {
         let mut input = Input::empty();
-        let mut reset_pending = false;
-        let mut died = false;
         let mut frame = 0;
         loop {
             // Play the game at 15fps to highlight major changes and for better performance
@@ -121,19 +111,15 @@ impl Backend for TcpBackend {
 
             // Read the input from the agent
             if input_frame {
-                if let Ok(input_u8) = self.stream.read_u8() {
-                    input = Input::from_bits_truncate(input_u8);
+                if let Ok(input_recv) = self.client.recv_input() {
+                    input = input_recv;
                 } else {
                     break;
                 }
             }
 
-            // Avoid ticking the game until the next input frame if the player died or timed out
-            if !reset_pending {
-                died = self.game.tick(input);
-            }
+            let died = self.game.tick(input);
             let timeout = frame >= 60 * 60;
-            reset_pending = died || timeout;
 
             // Send the current results to the agent
             let reward = if died {
@@ -146,17 +132,15 @@ impl Backend for TcpBackend {
                     / 50.0)
                     * 0.5
             };
-            if input_frame {
+            if died || timeout || input_frame {
                 if self
-                    .stream
-                    .write_all(bytemuck::cast_slice(&self.game.renderer.buffer))
+                    .client
+                    .send_obv(&self.game.renderer, reward, died || timeout)
                     .is_err()
-                    || self.stream.write_f32::<LittleEndian>(reward).is_err()
-                    || self.stream.write_u8((died || timeout) as u8).is_err()
                 {
                     break;
                 }
-                if reset_pending {
+                if died || timeout {
                     if timeout {
                         info!(
                             "Player managed to survive 1 minute! {:?} {:?}",
@@ -164,7 +148,6 @@ impl Backend for TcpBackend {
                         );
                     }
                     self.game = Default::default();
-                    reset_pending = false;
                     frame = 0;
                 }
             }

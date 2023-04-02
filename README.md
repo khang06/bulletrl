@@ -1,27 +1,15 @@
-# bullettest
-bullettest is a barebones [OpenAI Gym](https://github.com/openai/gym) environment modeled after a popular bullet hell game. It's quite basic and doesn't have much variety, but it should be an interesting enough benchmark for reinforcement learning algorithms.
+# bulletrl
+bulletrl is a simple [OpenAI Gym](https://github.com/openai/gym) environment for training reinforcement learning models on bullet hell games. It's mostly developed around Touhou Project games for now.
 
-![](imgs/1.png) ![](imgs/2.png) ![](imgs/3.png) ![](imgs/4.png)
+Currently, the supported games are:
+* bullettest (barebones test environment)
+* Touhou Koumakyou ~ the Embodiment of Scarlet Devil v1.02h
 
-For now, only one enemy is supported. There are a couple of randomized movement options:
-
-* Static: The enemy stays in one place
-* Sine: The enemy oscillates on the x-axis
-* EaseOutExpo: The enemy is interpolated to a new position on a regular interval
-
-And bullet patterns:
-
-* Spiral: Bullets are shot out in a spiral from the enemy
-* Direct: Bullets are shot directly towards the player with some spread on a regular interval
-* Burst: Bullets are shot towards the player in evenly spaced batches on a regular interval
-
-More complexity will probably be added once I can train a good model on what I have now.
+Ports to other games are welcome.
 
 # TODO
-- [x] Train a working model: Trained for 100m steps, download it [here](https://files.catbox.moe/qeggsn.zip)
-- [ ] Curriculum learning
-- [ ] More diverse enemy behavior
+- [x] Train a working model for bullettest: Trained for 100m steps, download it [here](https://files.catbox.moe/qeggsn.zip)
 - [ ] Refactor common interface code into a library
-- [ ] Port/rewrite [th6hook](https://github.com/khang06/th6hook)
+- [x] Port/rewrite [th6hook](https://github.com/khang06/th6hook)
 - [ ] Support for manual environment resets
 - [ ] Configurability

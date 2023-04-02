@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 
 use crate::util::{self, check_rect_overlap, Vector2};
-use bitflags::bitflags;
+use bulletrl_common::{FIELD_HEIGHT, FIELD_WIDTH};
 use log::info;
 use rand::{
     distributions::Standard,
@@ -9,8 +9,6 @@ use rand::{
     Rng,
 };
 
-pub const FIELD_WIDTH: usize = 384;
-pub const FIELD_HEIGHT: usize = 448;
 const PLAYER_SIZE: i32 = 5;
 const ENEMY_SIZE: i32 = 25;
 const ENEMY_X_RANGE: RangeInclusive<f32> =
@@ -18,18 +16,8 @@ const ENEMY_X_RANGE: RangeInclusive<f32> =
 const ENEMY_Y_RANGE: RangeInclusive<f32> = 50.0f32..=150.0f32;
 const BULLET_LIMIT: usize = 640;
 
-bitflags! {
-    pub struct Input: u8 {
-        const UP = 0b00000001;
-        const DOWN = 0b00000010;
-        const LEFT = 0b00000100;
-        const RIGHT = 0b00001000;
-        const FOCUS = 0b00010000;
-    }
-}
-
 pub struct Game {
-    pub renderer: Renderer,
+    pub renderer: bulletrl_common::Renderer,
     pub player: Player,
     pub enemy: Enemy, // TODO: multiple enemies
     pub bullets: Box<[Option<Bullet>]>,
@@ -49,7 +37,7 @@ impl Default for Game {
 }
 
 impl Game {
-    pub fn tick(&mut self, input: Input) -> bool {
+    pub fn tick(&mut self, input: bulletrl_common::Input) -> bool {
         self.frame += 1;
         for x in self.bullets.iter_mut() {
             if let Some(bullet) = x {
@@ -87,37 +75,6 @@ impl Game {
     }
 }
 
-pub struct Renderer {
-    pub buffer: Box<[u32]>,
-}
-
-impl Default for Renderer {
-    fn default() -> Self {
-        Renderer {
-            buffer: (vec![0; FIELD_WIDTH * FIELD_HEIGHT]).into_boxed_slice(),
-        }
-    }
-}
-
-impl Renderer {
-    pub fn clear(&mut self) {
-        self.buffer.fill(0u32);
-    }
-
-    pub fn draw_rect(&mut self, color: u32, x: i32, y: i32, w: i32, h: i32) {
-        let left = (x - w / 2).clamp(0, FIELD_WIDTH as i32 - 1) as usize;
-        let right = (x + w / 2).clamp(0, FIELD_WIDTH as i32 - 1) as usize;
-        let top = (y - h / 2).clamp(0, FIELD_HEIGHT as i32 - 1) as usize;
-        let bottom = (y + h / 2).clamp(0, FIELD_HEIGHT as i32 - 1) as usize;
-
-        for y in top..=bottom {
-            for x in left..=right {
-                self.buffer[y * FIELD_WIDTH + x] = color;
-            }
-        }
-    }
-}
-
 pub struct Player {
     pub pos: Vector2,
 }
@@ -131,7 +88,9 @@ impl Default for Player {
 }
 
 impl Player {
-    pub fn tick(&mut self, input: Input, bullets: &mut [Option<Bullet>]) -> bool {
+    pub fn tick(&mut self, input: bulletrl_common::Input, bullets: &mut [Option<Bullet>]) -> bool {
+        use bulletrl_common::Input;
+
         // TODO: this kinda sucks
         let diagonal = input.contains(Input::UP | Input::LEFT)
             || input.contains(Input::UP | Input::RIGHT)
@@ -176,7 +135,7 @@ impl Player {
         false
     }
 
-    pub fn draw(&self, renderer: &mut Renderer) {
+    pub fn draw(&self, renderer: &mut bulletrl_common::Renderer) {
         // The hitbox is very small, so the player will be rendered larger to actually be visible
         renderer.draw_rect(
             0x00FF0000,
@@ -400,7 +359,7 @@ impl Enemy {
         }
     }
 
-    pub fn draw(&mut self, renderer: &mut Renderer) {
+    pub fn draw(&mut self, renderer: &mut bulletrl_common::Renderer) {
         renderer.draw_rect(
             0x0000FF00,
             self.pos.x as i32,
@@ -433,7 +392,7 @@ impl Bullet {
         false
     }
 
-    pub fn draw(&mut self, renderer: &mut Renderer) {
+    pub fn draw(&mut self, renderer: &mut bulletrl_common::Renderer) {
         // Bullets are also drawn very large compared to their hitboxes, so they'll be scaled here too
         renderer.draw_rect(
             0x000000FF,
